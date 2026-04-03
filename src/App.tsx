@@ -1,121 +1,162 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "./components/ui/card";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { Plus, Minus, Play } from "lucide-react";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [rows, setRows] = useState(3);
+  const [cols, setCols] = useState(4);
+
+  const [matrix, setMatrix] = useState(
+    Array.from({ length: 3 }, () => Array(4).fill(""))
+  );
+
+  const handleCellChange = (
+    rowIndex: number,
+    colIndex: number,
+    value: string
+  ) => {
+    if (!/^-?\d*[.,]?\d*$/.test(value) && value !== "") return;
+
+    const newMatrix = [...matrix];
+    newMatrix[rowIndex][colIndex] = value.replace(",", ".");
+    setMatrix(newMatrix);
+  };
+
+  const updateDimensions = (newRows: number, newCols: number) => {
+    if (newRows < 2 || newCols < 3 || newRows > 8 || newCols > 9) return;
+
+    const newMatrix = Array.from({ length: newRows }, (_, i) =>
+      Array.from({ length: newCols }, (_, j) =>
+        matrix[i]?.[j] !== undefined ? matrix[i][j] : ""
+      )
+    );
+
+    setRows(newRows);
+    setCols(newCols);
+    setMatrix(newMatrix);
+  };
+
+  const handleSolve = () => {
+    console.log("Matriz pronta para o cálculo:", matrix);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <Card className="w-full max-w-4xl shadow-lg border-slate-200">
+        <CardHeader className="text-center pb-8">
+          <CardTitle className="text-3xl font-bold text-slate-800">
+            Solucionador de Sistemas Lineares
+          </CardTitle>
+          <CardDescription className="text-slate-500 text-lg mt-2">
+            Insira os coeficientes da matriz ampliada [A|b] para iniciar o
+            escalonamento.
+          </CardDescription>
+        </CardHeader>
 
-      <div className="ticks"></div>
+        <CardContent className="flex flex-col items-center gap-8">
+          <div className="flex gap-8 bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-sm font-medium text-slate-600">
+                Equações (Linhas)
+              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateDimensions(rows - 1, cols)}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-4 text-center font-semibold">{rows}</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateDimensions(rows + 1, cols)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            <div className="w-px bg-slate-200" />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-sm font-medium text-slate-600">
+                Variáveis (Colunas A)
+              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateDimensions(rows, cols - 1)}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-4 text-center font-semibold">
+                  {cols - 1}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => updateDimensions(rows, cols + 1)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="grid gap-2 items-center justify-center p-6 bg-slate-100/50 rounded-xl border border-slate-200"
+            style={{
+              gridTemplateColumns: `repeat(${cols}, minmax(4rem, 6rem))`,
+            }}
+          >
+            {matrix.map((row, rowIndex) =>
+              row.map((cellValue, colIndex) => {
+                const isAugmentedColumn = colIndex === cols - 1;
+                return (
+                  <Input
+                    key={`${rowIndex}-${colIndex}`}
+                    type="text"
+                    value={cellValue}
+                    onChange={(e) =>
+                      handleCellChange(rowIndex, colIndex, e.target.value)
+                    }
+                    className={`text-center font-mono text-lg transition-all focus:ring-2 
+                      ${
+                        isAugmentedColumn
+                          ? "border-l-4 border-l-blue-400 bg-blue-50/30"
+                          : "bg-white"
+                      }`}
+                    placeholder="0"
+                  />
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex justify-center pt-6 pb-8 border-t border-slate-100 mt-4">
+          <Button
+            onClick={handleSolve}
+            size="lg"
+            className="w-full max-w-md bg-blue-600 hover:bg-blue-700 text-lg py-6 shadow-md"
+          >
+            <Play className="mr-2 h-5 w-5" />
+            Iniciar Escalonamento
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
 }
-
-export default App
