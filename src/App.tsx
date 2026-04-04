@@ -10,24 +10,27 @@ import {
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Plus, Minus, Play } from "lucide-react";
+import { cn } from "./lib/utils";
 
 export default function App() {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(4);
 
-  const [matrix, setMatrix] = useState(
-    Array.from({ length: 3 }, () => Array(4).fill(""))
+  const [matrix, setMatrix] = useState<number[][]>(
+    Array.from({ length: 3 }, () => Array(4).fill(NaN)),
   );
 
   const handleCellChange = (
     rowIndex: number,
     colIndex: number,
-    value: string
+    value: string,
   ) => {
-    if (!/^-?\d*[.,]?\d*$/.test(value) && value !== "") return;
+    const parsed = value === "" || value === "-" ? NaN : parseFloat(value);
 
-    const newMatrix = [...matrix];
-    newMatrix[rowIndex][colIndex] = value.replace(",", ".");
+    const newMatrix = matrix.map((row, i) =>
+      row.map((cell, j) => (i === rowIndex && j === colIndex ? parsed : cell)),
+    );
+
     setMatrix(newMatrix);
   };
 
@@ -35,9 +38,7 @@ export default function App() {
     if (newRows < 2 || newCols < 3 || newRows > 8 || newCols > 9) return;
 
     const newMatrix = Array.from({ length: newRows }, (_, i) =>
-      Array.from({ length: newCols }, (_, j) =>
-        matrix[i]?.[j] !== undefined ? matrix[i][j] : ""
-      )
+      Array.from({ length: newCols }, (_, j) => matrix[i]?.[j] ?? NaN),
     );
 
     setRows(newRows);
@@ -46,107 +47,169 @@ export default function App() {
   };
 
   const handleSolve = () => {
-    console.log("Matriz pronta para o cálculo:", matrix);
+    if (matrix.some((row) => row.some((cell) => isNaN(cell)))) {
+      alert("Por favor, preencha todos os campos com valores numéricos.");
+      return;
+    }
+
+    const matrixCopy = matrix.map((row) => [...row]);
+    const numRows = matrixCopy.length;
+    const numCols = matrixCopy[0].length;
+    const numVars = numCols - 1;
+
+    console.log("Matriz inicial:", JSON.stringify(matrixCopy));
+
+    // Inicia loop para preparar a matriz para o escalonamento
+    for (let i = 0; i < Math.min(numRows, numVars); i++) {
+      for (let j = i; j < numRows; j++) {
+        const row = matrixCopy[j];
+
+        // Verifica se o elemento na posição [j][i] é 1 e, se for, move essa linha para a posição [i] (linha atual) e o loop para
+        if (row[i] === 1) {
+          if (j === i) break; // Já está na posição correta
+
+          const intialRowCopy = [...matrixCopy[i]];
+
+          matrixCopy[i] = [...row];
+
+          matrixCopy[j] = intialRowCopy;
+          break;
+        }
+
+        // Se o elemento na posição [j][i] for maior que o elemento na posição [i][i], troca as linhas
+        if (Math.abs(row[i]) > Math.abs(matrixCopy[i][i])) {
+          const intialRowCopy = [...matrixCopy[i]];
+
+          matrixCopy[i] = [...row];
+
+          matrixCopy[j] = intialRowCopy;
+        }
+      }
+
+      const pivot = matrixCopy[i][i];
+      if (pivot === 0) continue;
+
+      for (let k = 0; k < matrixCopy[i].length; k++) {
+        matrixCopy[i][k] /= pivot;
+      }
+
+      // Inicia loop para eliminar os elementos abaixo do pivô
+      for (let j = 0; j < numRows; j++) {
+        // Pula a linha atual
+        if (j === i) continue;
+
+        // Calcula o fator de multiplicação para eliminar o elemento na posição [j][i]
+        const factor = matrixCopy[j][i];
+
+        // Se o fator for zero, a linha já está eliminada, então pula para a próxima linha
+        if (factor === 0) continue;
+
+        // Subtrai o produto da linha atual (linha i) multiplicada pelo fator da linha j para eliminar o elemento na posição [j][i]
+        for (let k = 0; k < matrixCopy[i].length; k++) {
+          matrixCopy[j][k] -= factor * matrixCopy[i][k];
+        }
+      }
+    }
+
+    console.log("Matriz final:", JSON.stringify(matrixCopy));
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <Card className="w-full max-w-4xl shadow-lg border-slate-200">
-        <CardHeader className="text-center pb-8">
-          <CardTitle className="text-3xl font-bold text-slate-800">
-            Solucionador de Sistemas Lineares
-          </CardTitle>
-          <CardDescription className="text-slate-500 text-lg mt-2">
+    <div className="flex-container min-w-dvw bg-background min-h-dvh justify-center items-center">
+      <Card className="w-full max-w-4xl shadow-lg">
+        <CardHeader className="text-center">
+          <CardTitle>Solucionador de Sistemas Lineares</CardTitle>
+          <CardDescription>
             Insira os coeficientes da matriz ampliada [A|b] para iniciar o
             escalonamento.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="flex flex-col items-center gap-8">
-          <div className="flex gap-8 bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-sm font-medium text-slate-600">
-                Equações (Linhas)
-              </span>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateDimensions(rows - 1, cols)}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <span className="w-4 text-center font-semibold">{rows}</span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateDimensions(rows + 1, cols)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+        <CardContent className="flex-container items-center gap-6">
+          <div className="flex-container justify-center">
+            <div className="flex-container w-auto justify-center gap-6 p-4 rounded-lg border shadow-sm">
+              <div className="flex-container w-40 items-center gap-2">
+                <div className="flex-container justify-center">
+                  <span>Equações (Linhas)</span>
+                </div>
+                <div className="flex-container justify-center items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => updateDimensions(rows - 1, cols)}
+                  >
+                    <Minus className="size-4" />
+                  </Button>
+                  <span className="w-4 text-center font-semibold">{rows}</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => updateDimensions(rows + 1, cols)}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            <div className="w-px bg-slate-200" />
-
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-sm font-medium text-slate-600">
-                Variáveis (Colunas A)
-              </span>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateDimensions(rows, cols - 1)}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <span className="w-4 text-center font-semibold">
-                  {cols - 1}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => updateDimensions(rows, cols + 1)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+              <div className="flex-container w-40 items-center gap-2">
+                <div className="flex-container justify-center">
+                  <span>Variáveis (Colunas A)</span>
+                </div>
+                <div className="flex-container justify-center items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => updateDimensions(rows, cols - 1)}
+                  >
+                    <Minus className="size-4" />
+                  </Button>
+                  <span className="w-4 text-center font-semibold">
+                    {cols - 1}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => updateDimensions(rows, cols + 1)}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div
-            className="grid gap-2 items-center justify-center p-6 bg-slate-100/50 rounded-xl border border-slate-200"
-            style={{
-              gridTemplateColumns: `repeat(${cols}, minmax(4rem, 6rem))`,
-            }}
-          >
-            {matrix.map((row, rowIndex) =>
-              row.map((cellValue, colIndex) => {
-                const isAugmentedColumn = colIndex === cols - 1;
-                return (
-                  <Input
-                    key={`${rowIndex}-${colIndex}`}
-                    type="text"
-                    value={cellValue}
-                    onChange={(e) =>
-                      handleCellChange(rowIndex, colIndex, e.target.value)
-                    }
-                    className={`text-center font-mono text-lg transition-all focus:ring-2 
-                      ${
-                        isAugmentedColumn
-                          ? "border-l-4 border-l-blue-400 bg-blue-50/30"
-                          : "bg-white"
-                      }`}
-                    placeholder="0"
-                  />
-                );
-              })
-            )}
+          <div className="flex-container justify-center">
+            <div
+              className="grid gap-2 items-center justify-center p-6  rounded-xl border "
+              style={{
+                gridTemplateColumns: `repeat(${cols}, minmax(4rem, 6rem))`,
+              }}
+            >
+              {matrix.map((row, rowIndex) =>
+                row.map((cellValue, colIndex) => {
+                  const isAugmentedColumn = colIndex === cols - 1;
+                  return (
+                    <Input
+                      key={`${rowIndex}-${colIndex}`}
+                      type="number"
+                      value={isNaN(cellValue) ? "" : cellValue}
+                      onChange={(e) =>
+                        handleCellChange(rowIndex, colIndex, e.target.value)
+                      }
+                      className={cn(
+                        "text-center font-mono text-lg transition-all",
+                        isAugmentedColumn &&
+                          "bg-primary/20 border-primary focus-visible:border-primary focus-visible:ring-primary/50",
+                      )}
+                    />
+                  );
+                }),
+              )}
+            </div>
           </div>
         </CardContent>
 
-        <CardFooter className="flex justify-center pt-6 pb-8 border-t border-slate-100 mt-4">
+        <CardFooter className="flex-container justify-center mt-4">
           <Button
             onClick={handleSolve}
             size="lg"
