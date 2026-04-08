@@ -12,9 +12,17 @@ import { Input } from "./components/ui/input";
 import { Plus, Minus, Play } from "lucide-react";
 import { cn } from "./lib/utils";
 
+interface Step {
+  description: string;
+  matrix: number[][];
+}
+
 export default function App() {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(4);
+
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [systemType, setSystemType] = useState<string | null>(null);
 
   const [matrix, setMatrix] = useState<number[][]>(
     Array.from({ length: 3 }, () => Array(4).fill(NaN)),
@@ -57,56 +65,112 @@ export default function App() {
     const numCols = matrixCopy[0].length;
     const numVars = numCols - 1;
 
+    const newSteps: Step[] = [];
+
+    const saveStep = (description: string) => {
+      newSteps.push({
+        description,
+        matrix: matrixCopy.map((row) => [...row]),
+      });
+    };
+
     console.log("Matriz inicial:", JSON.stringify(matrixCopy));
 
+    // Antes, eu tava utilizando apenas um i para controlar a linha e a coluna, se um numero do pivot era 3 em matrizes
+    // irregulares, ele avançava a linha e a coluna, o que causavas erros pois uma linha poderia nunca ser processada
+    // Agora, eu utilizo um pivotRow separado para controlar a linha atual do pivô, e o loop de coluna avança normalmente,
+    // garantindo que todas as linhas sejam processadas corretamente, mesmo em matrizes irregulares.
+
+    let pivotRow = 0;
     // Inicia loop para preparar a matriz para o escalonamento
-    for (let i = 0; i < Math.min(numRows, numVars); i++) {
-      for (let j = i; j < numRows; j++) {
+    for (let col = 0; col < numVars && pivotRow < numRows; col++) {
+      for (let j = pivotRow; j < numRows; j++) {
         const row = matrixCopy[j];
 
-        // Verifica se o elemento na posição [j][i] é 1 e, se for, move essa linha para a posição [i] (linha atual) e o loop para
-        if (row[i] === 1) {
-          if (j === i) break; // Já está na posição correta
+        // Verifica se o elemento na posição [j][col] é 1 e, se for, move essa linha para a posição [col] (linha atual) e o loop para
+        if (row[col] === 1) {
+          if (j === pivotRow) break; // Já está na posição correta
 
-          const intialRowCopy = [...matrixCopy[i]];
+          const intialRowCopy = [...matrixCopy[pivotRow]];
 
-          matrixCopy[i] = [...row];
+          matrixCopy[pivotRow] = [...row];
 
           matrixCopy[j] = intialRowCopy;
+
+          saveStep(`Troca L${pivotRow + 1} com L${j + 1}`);
           break;
         }
 
-        // Se o elemento na posição [j][i] for maior que o elemento na posição [i][i], troca as linhas
-        if (Math.abs(row[i]) > Math.abs(matrixCopy[i][i])) {
-          const intialRowCopy = [...matrixCopy[i]];
-
-          matrixCopy[i] = [...row];
-
+        // Se o elemento na posição [j][col] for maior que o elemento na posição [col][col], troca as linhas
+        if (Math.abs(row[col]) > Math.abs(matrixCopy[pivotRow][col])) {
+          const intialRowCopy = [...matrixCopy[pivotRow]];
+          matrixCopy[pivotRow] = [...row];
           matrixCopy[j] = intialRowCopy;
+
+          saveStep(`Troca L${pivotRow + 1} com L${j + 1}`);
         }
       }
 
-      const pivot = matrixCopy[i][i];
+      const pivot = matrixCopy[pivotRow][col];
       if (pivot === 0) continue;
 
-      for (let k = 0; k < matrixCopy[i].length; k++) {
-        matrixCopy[i][k] /= pivot;
+      // Normaliza pivo
+      for (let k = 0; k < matrixCopy[pivotRow].length; k++) {
+        matrixCopy[pivotRow][k] /= pivot;
+
+        saveStep(`L${pivotRow + 1} = L${pivotRow + 1} / ${pivot}`);
       }
 
       // Inicia loop para eliminar os elementos abaixo do pivô
       for (let j = 0; j < numRows; j++) {
         // Pula a linha atual
-        if (j === i) continue;
+        if (j === pivotRow) continue;
 
-        // Calcula o fator de multiplicação para eliminar o elemento na posição [j][i]
-        const factor = matrixCopy[j][i];
+        // Calcula o fator de multiplicação para eliminar o elemento na posição [j][col]
+        const factor = matrixCopy[j][col];
 
         // Se o fator for zero, a linha já está eliminada, então pula para a próxima linha
         if (factor === 0) continue;
 
         // Subtrai o produto da linha atual (linha i) multiplicada pelo fator da linha j para eliminar o elemento na posição [j][i]
-        for (let k = 0; k < matrixCopy[i].length; k++) {
-          matrixCopy[j][k] -= factor * matrixCopy[i][k];
+        for (let k = 0; k < matrixCopy[pivotRow].length; k++) {
+          matrixCopy[j][k] -= factor * matrixCopy[pivotRow][k];
+        }
+
+        const signal = factor > 0 ? "-" : "+";
+        saveStep(
+          `L${j + 1} = L${j + 1} ${signal} ${Math.abs(factor)} × L${pivotRow + 1}`,
+        );
+      }
+
+      let type = "SPD";
+      for (let i = 0; i < numRows; i++) {
+        const allZeroCoefs = matrixCopy[i]
+          .slice(0, numVars)
+          .every((v) => v === 0);
+        const lastCol = matrixCopy[i][numVars];
+
+        if (allZeroCoefs && lastCol !== 0) {
+          type = "SI";
+          break;
+        }
+        if (allZeroCoefs && lastCol === 0) {
+          type = "SPI";
+        }
+      }
+
+      pivotRow++;
+
+      setSteps(newSteps);
+      setSystemType(type);
+    }
+
+    // Isso faz uma limpeza final da matriz para evitar problemas de precisão, transformando valores muito próximos de zero em exatamente zero
+    // Erro que aconteceu em alguns testes
+    for (let i = 0; i < numRows; i++) {
+      for (let j = 0; j < matrixCopy[i].length; j++) {
+        if (Math.abs(matrixCopy[i][j]) < 1e-10) {
+          matrixCopy[i][j] = 0;
         }
       }
     }
@@ -115,7 +179,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex-container min-w-dvw bg-background min-h-dvh justify-center items-center">
+    <div className="flex-container gap-8 bg-background min-h-dvh justify-center items-center p-8">
       <Card className="w-full max-w-4xl shadow-lg">
         <CardHeader className="text-center">
           <CardTitle>Solucionador de Sistemas Lineares</CardTitle>
@@ -213,13 +277,67 @@ export default function App() {
           <Button
             onClick={handleSolve}
             size="lg"
-            className="w-full max-w-md bg-blue-600 hover:bg-blue-700 text-lg py-6 shadow-md"
+            className="w-full max-w-md bg-primary text-lg py-6 shadow-md"
           >
             <Play className="mr-2 h-5 w-5" />
             Iniciar Escalonamento
           </Button>
         </CardFooter>
       </Card>
+
+      {steps.length > 0 && (
+        <div className="flex-container max-w-4xl gap-8 justify-center">
+          {steps.map((step, index) => (
+            <div
+              className="flex-container border rounded-xl p-4 gap-2"
+              key={index}
+            >
+              <div className="flex-container">
+                <span className="font-semibold text-sm text-muted-foreground">
+                  Passo {index + 1}: {step.description}
+                </span>
+              </div>
+              <div
+                className="grid gap-1 w-fit"
+                style={{
+                  gridTemplateColumns: `repeat(${step.matrix[0].length}, minmax(3rem, 5rem))`,
+                }}
+              >
+                {step.matrix.map((row, rowIndex) =>
+                  row.map((val, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={cn(
+                        "text-center font-mono text-sm border rounded p-1 text-foreground",
+                        colIndex === step.matrix[0].length - 1 &&
+                          "bg-primary/20 border-primary",
+                      )}
+                    >
+                      {parseFloat(val.toFixed(6))}
+                    </div>
+                  )),
+                )}
+              </div>
+            </div>
+          ))}
+
+          <div
+            className={cn(
+              "border rounded-xl p-4 shadow-sm text-center text-lg font-bold",
+              systemType === "SPD" &&
+                "bg-green-100 text-green-800 border-green-300",
+              systemType === "SPI" &&
+                "bg-yellow-100 text-yellow-800 border-yellow-300",
+              systemType === "SI" && "bg-red-100 text-red-800 border-red-300",
+            )}
+          >
+            Sistema {systemType}
+            {systemType === "SPD" && " — Solução única"}
+            {systemType === "SPI" && " — Infinitas soluções (variável livre)"}
+            {systemType === "SI" && " — Sem solução"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
