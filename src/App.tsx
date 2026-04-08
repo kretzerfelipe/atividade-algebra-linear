@@ -23,20 +23,21 @@ export default function App() {
 
   const [steps, setSteps] = useState<Step[]>([]);
   const [systemType, setSystemType] = useState<string | null>(null);
+  const [solution, setSolution] = useState<number[] | null>(null);
 
   const [matrix, setMatrix] = useState<number[][]>(
-    Array.from({ length: 3 }, () => Array(4).fill(NaN)),
+    Array.from({ length: 3 }, () => Array(4).fill(NaN))
   );
 
   const handleCellChange = (
     rowIndex: number,
     colIndex: number,
-    value: string,
+    value: string
   ) => {
     const parsed = value === "" || value === "-" ? NaN : parseFloat(value);
 
     const newMatrix = matrix.map((row, i) =>
-      row.map((cell, j) => (i === rowIndex && j === colIndex ? parsed : cell)),
+      row.map((cell, j) => (i === rowIndex && j === colIndex ? parsed : cell))
     );
 
     setMatrix(newMatrix);
@@ -46,7 +47,7 @@ export default function App() {
     if (newRows < 2 || newCols < 3 || newRows > 8 || newCols > 9) return;
 
     const newMatrix = Array.from({ length: newRows }, (_, i) =>
-      Array.from({ length: newCols }, (_, j) => matrix[i]?.[j] ?? NaN),
+      Array.from({ length: newCols }, (_, j) => matrix[i]?.[j] ?? NaN)
     );
 
     setRows(newRows);
@@ -117,9 +118,8 @@ export default function App() {
       // Normaliza pivo
       for (let k = 0; k < matrixCopy[pivotRow].length; k++) {
         matrixCopy[pivotRow][k] /= pivot;
-
-        saveStep(`L${pivotRow + 1} = L${pivotRow + 1} / ${pivot}`);
       }
+      saveStep(`L${pivotRow + 1} = L${pivotRow + 1} / ${pivot}`);
 
       // Inicia loop para eliminar os elementos abaixo do pivô
       for (let j = 0; j < numRows; j++) {
@@ -139,30 +139,14 @@ export default function App() {
 
         const signal = factor > 0 ? "-" : "+";
         saveStep(
-          `L${j + 1} = L${j + 1} ${signal} ${Math.abs(factor)} × L${pivotRow + 1}`,
+          `L${j + 1} = L${j + 1} ${signal} ${Math.abs(factor)} × L${
+            pivotRow + 1
+          }`
         );
       }
 
-      let type = "SPD";
-      for (let i = 0; i < numRows; i++) {
-        const allZeroCoefs = matrixCopy[i]
-          .slice(0, numVars)
-          .every((v) => v === 0);
-        const lastCol = matrixCopy[i][numVars];
-
-        if (allZeroCoefs && lastCol !== 0) {
-          type = "SI";
-          break;
-        }
-        if (allZeroCoefs && lastCol === 0) {
-          type = "SPI";
-        }
-      }
-
       pivotRow++;
-
       setSteps(newSteps);
-      setSystemType(type);
     }
 
     // Isso faz uma limpeza final da matriz para evitar problemas de precisão, transformando valores muito próximos de zero em exatamente zero
@@ -175,8 +159,56 @@ export default function App() {
       }
     }
 
+    // Classificação
+    let type = "SPD"; // Valor temporário
+    let validEquations = 0; // Quantos coeficienes validos
+
+    for (let i = 0; i < numRows; i++) {
+      const allZeroCoefs = matrixCopy[i]
+        .slice(0, numVars)
+        .every((v) => v === 0);
+      const lastCol = matrixCopy[i][numVars];
+
+      // 1. Condição de Sistema Impossível (0 = c)
+      if (allZeroCoefs && lastCol !== 0) {
+        type = "SI";
+        break; // Achou uma inconsistência, não precisa checar o resto
+      }
+
+      // Se a linha tem coeficientes válidos, incrementamos o contador
+      if (!allZeroCoefs) {
+        validEquations++;
+      }
+    }
+
+    // 2. Definindo entre SPD e SPI (se não for SI)
+    if (type !== "SI") {
+      if (validEquations === numVars) {
+        type = "SPD";
+      } else {
+        type = "SPI";
+      }
+    }
+
+    // Extração da solução
+    let finalSolution: number[] | null = null;
+    if (type === "SPD") {
+      finalSolution = [];
+      // Em um SPD puro e escalonado (Gauss-Jordan),
+      // os valores da diagonal principal estarão corretos
+      for (let i = 0; i < numVars; i++) {
+        finalSolution.push(matrixCopy[i][numVars]);
+      }
+    }
+
+    setSteps(newSteps);
+    setSystemType(type);
+    setSolution(finalSolution);
+
     console.log("Matriz final:", JSON.stringify(matrixCopy));
   };
+
+  console.log(systemType === "SPD" && solution);
 
   return (
     <div className="flex-container gap-8 bg-background min-h-dvh justify-center items-center p-8">
@@ -263,11 +295,11 @@ export default function App() {
                       className={cn(
                         "text-center font-mono text-lg transition-all",
                         isAugmentedColumn &&
-                          "bg-primary/20 border-primary focus-visible:border-primary focus-visible:ring-primary/50",
+                          "bg-primary/20 border-primary focus-visible:border-primary focus-visible:ring-primary/50"
                       )}
                     />
                   );
-                }),
+                })
               )}
             </div>
           </div>
@@ -310,12 +342,12 @@ export default function App() {
                       className={cn(
                         "text-center font-mono text-sm border rounded p-1 text-foreground",
                         colIndex === step.matrix[0].length - 1 &&
-                          "bg-primary/20 border-primary",
+                          "bg-primary/20 border-primary"
                       )}
                     >
                       {parseFloat(val.toFixed(6))}
                     </div>
-                  )),
+                  ))
                 )}
               </div>
             </div>
@@ -328,7 +360,7 @@ export default function App() {
                 "bg-green-100 text-green-800 border-green-300",
               systemType === "SPI" &&
                 "bg-yellow-100 text-yellow-800 border-yellow-300",
-              systemType === "SI" && "bg-red-100 text-red-800 border-red-300",
+              systemType === "SI" && "bg-red-100 text-red-800 border-red-300"
             )}
           >
             Sistema {systemType}
@@ -336,8 +368,22 @@ export default function App() {
             {systemType === "SPI" && " — Infinitas soluções (variável livre)"}
             {systemType === "SI" && " — Sem solução"}
           </div>
+
+          {systemType === "SPD" && solution && (
+            <div className="flex-container mt-2 text-base text-foreground font-mono font-medium">
+              Solução:{" "}
+              {solution.map((val, i) => (
+                <span key={i} className="text-foreground">
+                  {chars[i]}={parseFloat(val.toFixed(6))}
+                  {i < solution.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+const chars = ["x", "y", "z", "a", "b", "c", "d", "e", "f", "g", "h", "i"];
